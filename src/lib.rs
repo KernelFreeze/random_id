@@ -23,13 +23,13 @@ use fpe::ff1::{FlexibleNumeralString, FF1};
 /// ```
 pub struct RandomIdGenerator {
     key: [u8; 32],
-    digits: u64,
-    next: u64,
+    digits: usize,
+    next: usize,
     tweak: Vec<u8>,
 }
 
 impl RandomIdGenerator {
-    pub fn new(key: [u8; 32], tweak: u64, digits: u64) -> Self {
+    pub fn new(key: [u8; 32], tweak: u64, digits: usize) -> Self {
         let tweak = tweak.to_be_bytes().to_vec();
         Self {
             key,
@@ -40,34 +40,34 @@ impl RandomIdGenerator {
     }
 
     /// Splits a 4 digits decimal number into its digits. Adds leading zeros if needed.
-    fn split_number_digits(&self, mut number: u64) -> Vec<u16> {
+    fn split_number_digits(&self, mut number: usize) -> Vec<u16> {
         let mut digits = Vec::new();
         while number > 0 {
             digits.push((number % 10) as u16);
             number /= 10;
         }
-        while digits.len() < self.digits as usize {
+        while digits.len() < self.digits {
             digits.push(0);
         }
         digits.reverse();
         digits
     }
 
-    fn join_number_digits(digits: &[u16]) -> u64 {
-        digits.iter().fold(0, |acc, &digit| acc * 10 + digit as u64)
+    fn join_number_digits(digits: &[u16]) -> usize {
+        digits.iter().fold(0, |acc, &digit| acc * 10 + digit as usize)
     }
 
     fn remaining(&self) -> usize {
-        (self.len().saturating_sub(self.next)) as usize
+        self.len().saturating_sub(self.next)
     }
 
-    fn len(&self) -> u64 {
-        10u64.pow(self.digits as u32)
+    fn len(&self) -> usize {
+        10usize.pow(self.digits as u32)
     }
 }
 
 impl Iterator for RandomIdGenerator {
-    type Item = u64;
+    type Item = usize;
 
     fn next(&mut self) -> Option<Self::Item> {
         if self.next >= self.len() {
@@ -108,11 +108,11 @@ impl Iterator for RandomIdGenerator {
     }
 
     fn nth(&mut self, n: usize) -> Option<Self::Item> {
-        if self.next + n as u64 >= self.len() {
+        if self.next + n >= self.len() {
             return None;
         }
 
-        self.next += n as u64;
+        self.next += n;
         self.next()
     }
 }
