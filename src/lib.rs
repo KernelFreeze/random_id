@@ -58,23 +58,11 @@ impl RandomIdGenerator {
     }
 
     fn remaining(&self) -> usize {
-        (self.total() - self.next) as usize
+        (self.len() - self.next) as usize
     }
 
-    fn total(&self) -> u16 {
+    fn len(&self) -> u16 {
         10u16.pow(self.digits as u32)
-    }
-
-    fn next_random(&mut self) -> u16 {
-        let input = self.split_number_digits(self.next);
-        let numeral_string = FlexibleNumeralString::from(input);
-
-        let ff = FF1::<Aes256>::new(&self.key, 10).unwrap();
-        let output = ff.encrypt(&self.tweak, &numeral_string).unwrap();
-        let output = Vec::from(output);
-
-        self.next += 1;
-        Self::join_number_digits(&output)
     }
 }
 
@@ -82,32 +70,62 @@ impl Iterator for RandomIdGenerator {
     type Item = u16;
 
     fn next(&mut self) -> Option<Self::Item> {
-        if self.next >= self.total() {
-            return None;
-        }
-        Some(self.next_random())
+        let input = self.split_number_digits(self.next);
+        let numeral_string = FlexibleNumeralString::from(input);
+
+        let ff = FF1::<Aes256>::new(&self.key, 10).ok()?;
+        let output = ff.encrypt(&self.tweak, &numeral_string).ok()?;
+        let output = Vec::from(output);
+
+        self.next += 1;
+        Some(Self::join_number_digits(&output))
     }
 
     fn size_hint(&self) -> (usize, Option<usize>) {
         (self.remaining(), Some(self.remaining()))
     }
+
+    fn count(mut self) -> usize {
+        let remaining = self.remaining();
+
+        // Set next to total to make sure that the iterator is exhausted.
+        self.next = self.len();
+        remaining
+    }
+
+    fn last(mut self) -> Option<Self::Item> {
+        if self.next >= self.len() {
+            return None;
+        }
+
+        // Set next to total - 1 to make sure that the iterator returns the last element.
+        self.next = self.len() - 1;
+        self.next()
+    }
+
+    fn nth(&mut self, n: usize) -> Option<Self::Item> {
+        if self.next + n as u16 >= self.len() {
+            return None;
+        }
+
+        self.next += n as u16;
+        self.next()
+    }
 }
 
 #[cfg(test)]
 mod tests {
-    use rand::{Rng, SeedableRng};
-    use rand_xoshiro::Xoshiro256PlusPlus;
+    use rand::prelude::*;
 
     use super::*;
 
     #[test]
     fn test_split_number_digits() {
-        let mut rng = Xoshiro256PlusPlus::from_entropy();
+        let mut rng = rand::thread_rng();
         let mut key = [0u8; 32];
         rng.fill(&mut key);
 
         let id_generator = RandomIdGenerator::new(key.clone(), 0, 4);
-
         assert_eq!(id_generator.split_number_digits(0), [0, 0, 0, 0]);
         assert_eq!(id_generator.split_number_digits(1), [0, 0, 0, 1]);
         assert_eq!(id_generator.split_number_digits(8), [0, 0, 0, 8]);
@@ -131,7 +149,7 @@ mod tests {
 
     #[test]
     fn test_join_number_digits() {
-        let mut rng = Xoshiro256PlusPlus::from_entropy();
+        let mut rng = rand::thread_rng();
         let mut key = [0u8; 32];
         rng.fill(&mut key);
 
@@ -151,12 +169,11 @@ mod tests {
 
     #[test]
     fn test_random_id() {
-        let mut rng = Xoshiro256PlusPlus::from_entropy();
+        let mut rng = rand::thread_rng();
         let mut key = [0u8; 32];
         rng.fill(&mut key);
 
         let id_generator = RandomIdGenerator::new(key, 0, 2);
-
         let mut ids = id_generator.collect::<Vec<_>>();
         ids.sort();
 
@@ -165,16 +182,47 @@ mod tests {
 
     #[test]
     fn test_iterator_finished_return_none() {
-        let mut rng = Xoshiro256PlusPlus::from_entropy();
+        let mut rng = rand::thread_rng();
         let mut key = [0u8; 32];
         rng.fill(&mut key);
 
         let mut id_generator = RandomIdGenerator::new(key, 0, 2);
-
         for _ in 0..100 {
             assert!(id_generator.next().is_some());
         }
 
         assert!(id_generator.next().is_none());
+    }
+
+    #[test]
+    fn test_iterator_size_hint() {
+        let mut rng = rand::thread_rng();
+        let mut key = [0u8; 32];
+        rng.fill(&mut key);
+
+        let id_generator = RandomIdGenerator::new(key, 0, 2);
+        assert_eq!(id_generator.size_hint(), (100, Some(100)));
+    }
+
+    #[test]
+    fn test_iterator_count() {
+        let mut rng = rand::thread_rng();
+        let mut key = [0u8; 32];
+        rng.fill(&mut key);
+
+        let id_generator = RandomIdGenerator::new(key, 0, 2);
+        assert_eq!(id_generator.count(), 100);
+    }
+
+    #[test]
+    fn iterator_nth() {
+        let mut rng = rand::thread_rng();
+        let mut key = [0u8; 32];
+        rng.fill(&mut key);
+
+        let mut id_generator = RandomIdGenerator::new(key, 0, 2);
+        assert!(id_generator.nth(98).is_some());
+        assert!(id_generator.nth(0).is_some());
+        assert!(id_generator.nth(0).is_none());
     }
 }

@@ -11,4 +11,3 @@ fpe = { git = "https://github.com/str4d/fpe.git", version = "0.5.1", rev = "98c6
 
 [dev-dependencies]
 rand = "0.8.5"
-rand_xoshiro = "0.6.0"
