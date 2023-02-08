@@ -23,13 +23,13 @@ use fpe::ff1::{FlexibleNumeralString, FF1};
 /// ```
 pub struct RandomIdGenerator {
     key: [u8; 32],
-    digits: u16,
-    next: u16,
+    digits: u64,
+    next: u64,
     tweak: Vec<u8>,
 }
 
 impl RandomIdGenerator {
-    pub fn new(key: [u8; 32], tweak: u64, digits: u16) -> Self {
+    pub fn new(key: [u8; 32], tweak: u64, digits: u64) -> Self {
         let tweak = tweak.to_be_bytes().to_vec();
         Self {
             key,
@@ -40,10 +40,10 @@ impl RandomIdGenerator {
     }
 
     /// Splits a 4 digits decimal number into its digits. Adds leading zeros if needed.
-    fn split_number_digits(&self, mut number: u16) -> Vec<u16> {
+    fn split_number_digits(&self, mut number: u64) -> Vec<u16> {
         let mut digits = Vec::new();
         while number > 0 {
-            digits.push(number % 10);
+            digits.push((number % 10) as u16);
             number /= 10;
         }
         while digits.len() < self.digits as usize {
@@ -53,23 +53,27 @@ impl RandomIdGenerator {
         digits
     }
 
-    fn join_number_digits(digits: &[u16]) -> u16 {
-        digits.iter().fold(0, |acc, &digit| acc * 10 + digit)
+    fn join_number_digits(digits: &[u16]) -> u64 {
+        digits.iter().fold(0, |acc, &digit| acc * 10 + digit as u64)
     }
 
     fn remaining(&self) -> usize {
-        (self.len() - self.next) as usize
+        (self.len().saturating_sub(self.next)) as usize
     }
 
-    fn len(&self) -> u16 {
-        10u16.pow(self.digits as u32)
+    fn len(&self) -> u64 {
+        10u64.pow(self.digits as u32)
     }
 }
 
 impl Iterator for RandomIdGenerator {
-    type Item = u16;
+    type Item = u64;
 
     fn next(&mut self) -> Option<Self::Item> {
+        if self.next >= self.len() {
+            return None;
+        }
+
         let input = self.split_number_digits(self.next);
         let numeral_string = FlexibleNumeralString::from(input);
 
@@ -104,11 +108,11 @@ impl Iterator for RandomIdGenerator {
     }
 
     fn nth(&mut self, n: usize) -> Option<Self::Item> {
-        if self.next + n as u16 >= self.len() {
+        if self.next + n as u64 >= self.len() {
             return None;
         }
 
-        self.next += n as u16;
+        self.next += n as u64;
         self.next()
     }
 }
@@ -224,5 +228,30 @@ mod tests {
         assert!(id_generator.nth(98).is_some());
         assert!(id_generator.nth(0).is_some());
         assert!(id_generator.nth(0).is_none());
+    }
+
+    #[test]
+    fn same_seed_produce_same_ids() {
+        let mut rng = rand::thread_rng();
+        let mut key = [0u8; 32];
+        rng.fill(&mut key);
+
+        let id_generator1 = RandomIdGenerator::new(key.clone(), 0, 2);
+        let id_generator2 = RandomIdGenerator::new(key, 0, 2);
+
+        assert_eq!(
+            id_generator1.collect::<Vec<_>>(),
+            id_generator2.collect::<Vec<_>>()
+        );
+    }
+
+    #[test]
+    fn last_id_is_included() {
+        let mut rng = rand::thread_rng();
+        let mut key = [0u8; 32];
+        rng.fill(&mut key);
+
+        let id_generator = RandomIdGenerator::new(key, 0, 6);
+        assert!(id_generator.last().is_some());
     }
 }

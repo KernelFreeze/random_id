@@ -6,7 +6,7 @@ authors = ["Celeste Peláez <celeste@etheryal.net>"]
 description = "An iterator that generates IDs in a random order using the FPE algorithm"
 
 [dependencies]
-aes = "0.8.2"
+aes = "0.8"
 fpe = { git = "https://github.com/str4d/fpe.git", version = "0.5.1", rev = "98c629e85a381a68e2407b1785d8c7c606b62695" }
 
 [dev-dependencies]
