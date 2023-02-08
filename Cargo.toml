@@ -1,0 +1,14 @@
+[package]
+name = "random-id"
+version = "0.1.0"
+edition = "2021"
+authors = ["Celeste Peláez <celeste@etheryal.net>"]
+description = "An iterator that generates IDs in a random order using the FPE algorithm"
+
+[dependencies]
+aes = "0.8.2"
+fpe = { git = "https://github.com/str4d/fpe.git", version = "0.5.1", rev = "98c629e85a381a68e2407b1785d8c7c606b62695" }
+
+[dev-dependencies]
+rand = "0.8.5"
+rand_xoshiro = "0.6.0"
