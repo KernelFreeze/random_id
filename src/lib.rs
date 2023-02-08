@@ -5,6 +5,22 @@ use fpe::ff1::{FlexibleNumeralString, FF1};
 /// All returned numbers are in the range of [0, 10^digits).
 ///
 /// Numbers are generated using the FF1 algorithm.
+///
+/// ## Usage
+/// ```
+/// use random_id::RandomIdGenerator;
+/// use rand::prelude::*;
+///
+/// let mut rng = rand::thread_rng();
+/// let mut key = [0u8; 32];
+/// rng.fill(&mut key);
+///
+/// let mut id_generator = RandomIdGenerator::new(key, 0, 1);
+///
+/// for i in id_generator.take(10) {
+///    println!("{}", i);
+/// }
+/// ```
 pub struct RandomIdGenerator {
     key: [u8; 32],
     digits: u16,
@@ -13,7 +29,8 @@ pub struct RandomIdGenerator {
 }
 
 impl RandomIdGenerator {
-    pub fn new(key: [u8; 32], tweak: Vec<u8>, digits: u16) -> Self {
+    pub fn new(key: [u8; 32], tweak: u64, digits: u16) -> Self {
+        let tweak = tweak.to_be_bytes().to_vec();
         Self {
             key,
             tweak,
@@ -36,7 +53,7 @@ impl RandomIdGenerator {
         digits
     }
 
-    fn join_number_digits(&self, digits: &[u16]) -> u16 {
+    fn join_number_digits(digits: &[u16]) -> u16 {
         digits.iter().fold(0, |acc, &digit| acc * 10 + digit)
     }
 
@@ -57,7 +74,7 @@ impl RandomIdGenerator {
         let output = Vec::from(output);
 
         self.next += 1;
-        self.join_number_digits(&output)
+        Self::join_number_digits(&output)
     }
 }
 
@@ -86,12 +103,10 @@ mod tests {
     #[test]
     fn test_split_number_digits() {
         let mut rng = Xoshiro256PlusPlus::from_entropy();
-        let tweak = vec![0, 1, 2];
-
         let mut key = [0u8; 32];
         rng.fill(&mut key);
 
-        let id_generator = RandomIdGenerator::new(key.clone(), tweak.clone(), 4);
+        let id_generator = RandomIdGenerator::new(key.clone(), 0, 4);
 
         assert_eq!(id_generator.split_number_digits(0), [0, 0, 0, 0]);
         assert_eq!(id_generator.split_number_digits(1), [0, 0, 0, 1]);
@@ -100,14 +115,14 @@ mod tests {
         assert_eq!(id_generator.split_number_digits(123), [0, 1, 2, 3]);
         assert_eq!(id_generator.split_number_digits(1234), [1, 2, 3, 4]);
 
-        let id_generator = RandomIdGenerator::new(key.clone(), tweak.clone(), 3);
+        let id_generator = RandomIdGenerator::new(key.clone(), 0, 3);
         assert_eq!(id_generator.split_number_digits(0), [0, 0, 0]);
         assert_eq!(id_generator.split_number_digits(1), [0, 0, 1]);
         assert_eq!(id_generator.split_number_digits(8), [0, 0, 8]);
         assert_eq!(id_generator.split_number_digits(10), [0, 1, 0]);
         assert_eq!(id_generator.split_number_digits(123), [1, 2, 3]);
 
-        let id_generator = RandomIdGenerator::new(key, tweak.clone(), 2);
+        let id_generator = RandomIdGenerator::new(key, 0, 2);
         assert_eq!(id_generator.split_number_digits(0), [0, 0]);
         assert_eq!(id_generator.split_number_digits(1), [0, 1]);
         assert_eq!(id_generator.split_number_digits(8), [0, 8]);
@@ -117,52 +132,44 @@ mod tests {
     #[test]
     fn test_join_number_digits() {
         let mut rng = Xoshiro256PlusPlus::from_entropy();
-        let tweak = vec![0, 1, 2];
-
         let mut key = [0u8; 32];
         rng.fill(&mut key);
 
-        let id_generator = RandomIdGenerator::new(key, tweak, 4);
-
-        assert_eq!(id_generator.join_number_digits(&[]), 0);
-        assert_eq!(id_generator.join_number_digits(&[1]), 1);
-        assert_eq!(id_generator.join_number_digits(&[8]), 8);
-        assert_eq!(id_generator.join_number_digits(&[1, 0]), 10);
-        assert_eq!(id_generator.join_number_digits(&[1, 2, 3]), 123);
-        assert_eq!(id_generator.join_number_digits(&[1, 2, 3, 4]), 1234);
-
-        assert_eq!(id_generator.join_number_digits(&[0, 0, 0, 0]), 0);
-        assert_eq!(id_generator.join_number_digits(&[0, 0, 0, 1]), 1);
-        assert_eq!(id_generator.join_number_digits(&[0, 0, 0, 8]), 8);
-        assert_eq!(id_generator.join_number_digits(&[0, 0, 1, 0]), 10);
-        assert_eq!(id_generator.join_number_digits(&[0, 1, 2, 3]), 123);
-        assert_eq!(id_generator.join_number_digits(&[1, 2, 3, 4]), 1234);
+        assert_eq!(RandomIdGenerator::join_number_digits(&[]), 0);
+        assert_eq!(RandomIdGenerator::join_number_digits(&[1]), 1);
+        assert_eq!(RandomIdGenerator::join_number_digits(&[8]), 8);
+        assert_eq!(RandomIdGenerator::join_number_digits(&[1, 0]), 10);
+        assert_eq!(RandomIdGenerator::join_number_digits(&[1, 2, 3]), 123);
+        assert_eq!(RandomIdGenerator::join_number_digits(&[1, 2, 3, 4]), 1234);
+        assert_eq!(RandomIdGenerator::join_number_digits(&[0, 0, 0, 0]), 0);
+        assert_eq!(RandomIdGenerator::join_number_digits(&[0, 0, 0, 1]), 1);
+        assert_eq!(RandomIdGenerator::join_number_digits(&[0, 0, 0, 8]), 8);
+        assert_eq!(RandomIdGenerator::join_number_digits(&[0, 0, 1, 0]), 10);
+        assert_eq!(RandomIdGenerator::join_number_digits(&[0, 1, 2, 3]), 123);
+        assert_eq!(RandomIdGenerator::join_number_digits(&[1, 2, 3, 4]), 1234);
     }
 
     #[test]
     fn test_random_id() {
         let mut rng = Xoshiro256PlusPlus::from_entropy();
-        let tweak = vec![0, 1, 2];
-
         let mut key = [0u8; 32];
         rng.fill(&mut key);
 
-        let id_generator = RandomIdGenerator::new(key, tweak, 2);
+        let id_generator = RandomIdGenerator::new(key, 0, 2);
 
         let mut ids = id_generator.collect::<Vec<_>>();
         ids.sort();
+
         assert_eq!(ids, (0..100).collect::<Vec<_>>());
     }
 
     #[test]
     fn test_iterator_finished_return_none() {
         let mut rng = Xoshiro256PlusPlus::from_entropy();
-        let tweak = vec![0, 1, 2];
-
         let mut key = [0u8; 32];
         rng.fill(&mut key);
 
-        let mut id_generator = RandomIdGenerator::new(key, tweak, 2);
+        let mut id_generator = RandomIdGenerator::new(key, 0, 2);
 
         for _ in 0..100 {
             assert!(id_generator.next().is_some());
