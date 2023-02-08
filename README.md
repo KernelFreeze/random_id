@@ -1,6 +1,6 @@
 # RandomId
 
-Provides a lazy iterator that generates IDs in a random order using the FPE algorithm. This is useful for generating IDs that are not sequential, but are unique.
+Provides a lazy iterator that generates IDs in a random order using the FPE algorithm. It allows to generate IDs that are not sequential but are unique.
 
 ## Usage
 
